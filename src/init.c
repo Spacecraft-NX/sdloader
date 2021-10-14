@@ -19,7 +19,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <malloc.h>
-#include <sys/iosupport.h>
+//#include <sys/iosupport.h>
 #include "utils.h"
 
 void __libc_init_array(void);
@@ -28,8 +28,8 @@ void __libc_fini_array(void);
 extern uint8_t __bss_start__[], __bss_end__[];
 extern uint8_t __heap_start__[], __heap_end__[];
 
-extern char *fake_heap_start;
-extern char *fake_heap_end;
+char *fake_heap_start;
+char *fake_heap_end;
 
 int __program_argc;
 void **__program_argv;
@@ -45,7 +45,7 @@ static void __program_init_heap(void) {
 }
 
 static void __program_init_newlib_hooks(void) {
-    __syscalls.exit = __program_exit; /* For exit, etc. */
+    //__syscalls.exit = __program_exit; /* For exit, etc. */
 }
 
 static void __program_move_additional_sections(void) {

@@ -81,6 +81,7 @@ CONFIG_VIDEO_HW_CURSOR:	     - Uses the hardware cursor capability of the
 			       chip. Otherwise a blinking field is displayed
 */
 
+#include <stdint.h>
 #include "video_fb.h"
 #include <string.h>
 

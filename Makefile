@@ -8,7 +8,6 @@ endif
 
 TOPDIR ?= $(CURDIR)
 
-AMS		:= $(TOPDIR)/../../
 include $(DEVKITARM)/base_rules
 
 #---------------------------------------------------------------------------------

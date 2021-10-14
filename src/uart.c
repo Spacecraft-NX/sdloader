@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
  
+#include <stdint.h>
 #include "uart.h"
 #include "timers.h"
 #include "pinmux.h"
