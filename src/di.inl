@@ -307,6 +307,22 @@ static const cfg_op_t _dsi_auo_v1_init[14] = {
 	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST }
 };
 
+static const cfg_op_t _dsi_aula_init[13] = {
+	{ 0, DSI_WR_DATA, 0x1105 },
+	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST },
+	{ 1, 180, 0 },
+	{ 0, DSI_WR_DATA, 0xA015 },
+	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST },
+	{ 0, DSI_WR_DATA, 0x205315 },
+	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST },
+	{ 0, DSI_WR_DATA, 0x339 },
+	{ 0, DSI_WR_DATA, 0x51 },
+	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST },
+	{ 1, 5, 0 },
+	{ 0, DSI_WR_DATA, 0x2905 },
+	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST },
+};
+
 static const cfg_op_t _dsi_v2_init[5] = {
 	{ 0, DSI_WR_DATA, 0x1105 },
 	{ 0, DSI_TRIGGER, DSI_TRIGGER_HOST },

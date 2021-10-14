@@ -29,6 +29,7 @@
 #include "car.h"
 #include "apb_misc.h"
 #include "utils.h"
+#include "fuse.h"
 
 #include "di.inl"
 
@@ -65,6 +66,7 @@ void display_init()
     volatile tegra_pmc_t *pmc = pmc_get_regs();
     volatile tegra_pinmux_t *pinmux = pinmux_get_regs();
     int mariko = is_mariko();
+    int aula = ((fuse_get_reserved_odm(4) & 0xF0000) >> 16) == 4;
     
     /* Power on. */
     if (mariko)
@@ -105,32 +107,44 @@ void display_init()
     pinmux->lcd_bl_en &= ~PINMUX_TRISTATE;
     pinmux->lcd_rst &= ~PINMUX_TRISTATE;
     
-    /* Configure Backlight +-5V GPIOs. */
-    gpio_configure_mode(GPIO_LCD_BL_P5V, GPIO_MODE_GPIO);
-    gpio_configure_mode(GPIO_LCD_BL_N5V, GPIO_MODE_GPIO);
-    gpio_configure_direction(GPIO_LCD_BL_P5V, GPIO_DIRECTION_OUTPUT);
-    gpio_configure_direction(GPIO_LCD_BL_N5V, GPIO_DIRECTION_OUTPUT);
-        
-    /* Enable Backlight +5V. */
-    gpio_write(GPIO_LCD_BL_P5V, GPIO_LEVEL_HIGH); 
+    if (!aula)
+    {
+	    /* Configure Backlight +-5V GPIOs. */
+	    gpio_configure_mode(GPIO_LCD_BL_P5V, GPIO_MODE_GPIO);
+	    gpio_configure_mode(GPIO_LCD_BL_N5V, GPIO_MODE_GPIO);
+	    gpio_configure_direction(GPIO_LCD_BL_P5V, GPIO_DIRECTION_OUTPUT);
+	    gpio_configure_direction(GPIO_LCD_BL_N5V, GPIO_DIRECTION_OUTPUT);
+		
+	    /* Enable Backlight +5V. */
+	    gpio_write(GPIO_LCD_BL_P5V, GPIO_LEVEL_HIGH); 
 
-    udelay(10000);
+	    udelay(10000);
 
-    /* Enable Backlight -5V. */
-    gpio_write(GPIO_LCD_BL_N5V, GPIO_LEVEL_HIGH); 
+	    /* Enable Backlight -5V. */
+	    gpio_write(GPIO_LCD_BL_N5V, GPIO_LEVEL_HIGH); 
 
-    udelay(10000);
+	    udelay(10000);
 
-    /* Configure Backlight PWM, EN and RST GPIOs. */
-    gpio_configure_mode(GPIO_LCD_BL_PWM, GPIO_MODE_GPIO);
-    gpio_configure_mode(GPIO_LCD_BL_EN, GPIO_MODE_GPIO);
-    gpio_configure_mode(GPIO_LCD_BL_RST, GPIO_MODE_GPIO);    
-    gpio_configure_direction(GPIO_LCD_BL_PWM, GPIO_DIRECTION_OUTPUT);
-    gpio_configure_direction(GPIO_LCD_BL_EN, GPIO_DIRECTION_OUTPUT);
+	    /* Configure Backlight PWM, EN and RST GPIOs. */
+	    gpio_configure_mode(GPIO_LCD_BL_PWM, GPIO_MODE_GPIO);
+	    gpio_configure_mode(GPIO_LCD_BL_EN, GPIO_MODE_GPIO);
+    }
+    
+    gpio_configure_mode(GPIO_LCD_BL_RST, GPIO_MODE_GPIO);
+    
+    if (!aula)
+    {
+	    gpio_configure_direction(GPIO_LCD_BL_PWM, GPIO_DIRECTION_OUTPUT);
+	    gpio_configure_direction(GPIO_LCD_BL_EN, GPIO_DIRECTION_OUTPUT);
+    }
+    
     gpio_configure_direction(GPIO_LCD_BL_RST, GPIO_DIRECTION_OUTPUT);
     
-    /* Enable Backlight EN. */
-    gpio_write(GPIO_LCD_BL_EN, GPIO_LEVEL_HIGH);
+    if (!aula)
+    {
+	    /* Enable Backlight EN. */
+	    gpio_write(GPIO_LCD_BL_EN, GPIO_LEVEL_HIGH);
+    }
 
     /* Configure display interface and display. */
     MAKE_MIPI_CAL_REG(0x60) = 0;
@@ -162,7 +176,7 @@ void display_init()
 
     udelay(60000);
 
-    MAKE_DSI_REG(DSI_BTA_TIMING) = 0x50204;
+    MAKE_DSI_REG(DSI_BTA_TIMING) = aula ? 0x40103 : 0x50204;
     MAKE_DSI_REG(DSI_WR_DATA) = 0x337;
     MAKE_DSI_REG(DSI_TRIGGER) = DSI_TRIGGER_HOST;
     _display_dsi_wait(250000, DSI_TRIGGER, (DSI_TRIGGER_HOST | DSI_TRIGGER_VIDEO));
@@ -197,8 +211,12 @@ void display_init()
         case 0xF30: // AUO
             exec_cfg((uint32_t *)DSI_BASE, _dsi_auo_v1_init, 14);
             break;
+        case 0x2050:
+            exec_cfg((uint32_t *)DSI_BASE, _dsi_aula_init, 13);
         case 0x1020: // Innolux 
         case 0x1030: // AUO
+        case 0x1040:
+        default:
             exec_cfg((uint32_t *)DSI_BASE, _dsi_v2_init, 5);
             break;
     }
@@ -250,14 +268,56 @@ void display_init()
 
 void display_backlight(bool enable)
 {
-    /* Enable Backlight PWM. */
-    gpio_write(GPIO_LCD_BL_PWM, enable ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW);
+    if (_display_ver == 0x2050)
+    {
+        /* Enable FRAME_END_INT */
+        MAKE_DI_REG(DC_CMD_INT_ENABLE) = 2;
+
+        /* Configure DSI_LINE_TYPE as FOUR */
+        MAKE_DSI_REG(DSI_VIDEO_MODE_CONTROL) = 1;
+        MAKE_DSI_REG(DSI_VIDEO_MODE_CONTROL) = 9;
+
+        /* Set and wait for FRAME_END_INT */
+        MAKE_DI_REG(DC_CMD_INT_STATUS) = 2;
+        while(MAKE_DI_REG(DC_CMD_INT_STATUS) != 0);
+
+        /* Configure display brightness. */
+        MAKE_DSI_REG(DSI_WR_DATA) = 0x339;     
+        MAKE_DSI_REG(DSI_WR_DATA) = 0xFF0751;
+        
+        /* Set and wait for FRAME_END_INT */
+        MAKE_DI_REG(DC_CMD_INT_STATUS) = 2;
+        while(MAKE_DI_REG(DC_CMD_INT_STATUS) != 0);
+
+        /* Set client sync point block reset. */
+        MAKE_DSI_REG(DSI_INCR_SYNCPT_CNTRL) = 1;
+        udelay(300000);
+
+        /* Clear client sync point block resest. */
+        MAKE_DSI_REG(DSI_INCR_SYNCPT_CNTRL) = 0;
+        udelay(300000);
+
+        /* Clear DSI_LINE_TYPE config. */
+        MAKE_DSI_REG(DSI_VIDEO_MODE_CONTROL) = 0;
+
+        /* Disable FRAME_END_INT */
+        MAKE_DI_REG(DC_CMD_INT_ENABLE) = 0;
+        MAKE_DI_REG(DC_CMD_INT_STATUS) = 2;
+        
+    }
+    else
+    {
+        /* Enable Backlight PWM. */
+        gpio_write(GPIO_LCD_BL_PWM, enable ? GPIO_LEVEL_HIGH : GPIO_LEVEL_LOW);
+    }
 }
 
 void display_end()
 {
     volatile tegra_car_t *car = car_get_regs();
     volatile tegra_pinmux_t *pinmux = pinmux_get_regs();
+    int mariko = is_mariko();
+    int aula = ((fuse_get_reserved_odm(4) & 0xF0000) >> 16) == 4;
     
     /* Disable Backlight. */
     display_backlight(false);
@@ -272,7 +332,7 @@ void display_end()
 
     udelay(40000);
 
-    if (is_mariko())
+    if (mariko)
     {
         exec_cfg((uint32_t *)CAR_BASE, _car_init_mariko, 4);
         exec_cfg((uint32_t *)DSI_BASE, _dsi_deinit_mariko, 16);
@@ -284,7 +344,6 @@ void display_end()
     }
 
     udelay(10000);
-
     
     switch (_display_ver)
     {
@@ -312,15 +371,18 @@ void display_end()
 
     udelay(10000);
     
-    /* Disable Backlight -5V. */
-    gpio_write(GPIO_LCD_BL_N5V, GPIO_LEVEL_LOW); 
+    if (!aula)
+    {
+	    /* Disable Backlight -5V. */
+	    gpio_write(GPIO_LCD_BL_N5V, GPIO_LEVEL_LOW); 
 
-    udelay(10000);
+	    udelay(10000);
 
-    /* Disable Backlight +5V. */
-    gpio_write(GPIO_LCD_BL_P5V, GPIO_LEVEL_LOW); 
+	    /* Disable Backlight +5V. */
+	    gpio_write(GPIO_LCD_BL_P5V, GPIO_LEVEL_LOW); 
 
-    udelay(10000);
+	    udelay(10000);
+    }
 
     /* Disable clocks. */
     car->rst_dev_h_set = 0x1010000;
