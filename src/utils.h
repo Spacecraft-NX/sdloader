@@ -1,5 +1,7 @@
 /*
+ * Copyright (c) 2018 naehrwert
  * Copyright (c) 2018-2020 Atmosphère-NX
+ * Copyright (c) 2018-2020 CTCaer
  * Copyright (c) 2020 Spacecraft-NX
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -39,6 +41,25 @@
 #define NOINLINE        __attribute__((noinline))
 
 #define SET_SYSREG(reg, val) do { temp_reg = (val); __asm__ __volatile__ ("msr " #reg ", %0" :: "r"(temp_reg) : "memory"); } while(false)
+
+#define PMC_BASE 0x7000E400
+#define TMR_BASE 0x60005000
+#define PMC(off) _REG(PMC_BASE, off)
+#define TMR(off) _REG(TMR_BASE, off)
+#define _REG(base, off) *(volatile unsigned int *)((base) + (off))
+
+#define APBDEV_PMC_SCRATCH200       0x840
+#define TIMER_WDT4_UNLOCK_PATTERN   (0x10C + 0x80)
+#define  TIMER_MAGIC_PTRN           0xC45A
+#define TIMER_TMR9_TMR_PTV          0x80
+#define  TIMER_PER_EN               BIT(30)
+#define  TIMER_EN                   BIT(31)
+#define TIMER_WDT4_CONFIG           (0x100 + 0x80)
+#define  TIMER_SRC(TMR)             ((TMR) & 0xF)
+#define  TIMER_PER(PER)             (((PER) & 0xFF) << 4)
+#define  TIMER_PMCRESET_EN          BIT(15)
+#define TIMER_WDT4_COMMAND          (0x108 + 0x80)
+#define  TIMER_START_CNT            BIT(0)
 
 static inline uintptr_t get_physical_address(const void *addr) {
     return (uintptr_t)addr;
@@ -124,6 +145,7 @@ __attribute__((noreturn)) void wait_for_button_and_reboot(void);
 
 __attribute__((noreturn)) void fatal_error(const char *fmt, ...);
 __attribute__((noreturn)) void power_off(void);
+__attribute__((noreturn)) void panic(uint32_t val);
 
 int is_mariko();
 
