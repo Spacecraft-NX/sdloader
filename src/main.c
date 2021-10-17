@@ -379,7 +379,7 @@ int main(void) {
     uint8_t modchip_buf[512];
 
     nx_hwinit();
-    sdmmc_init(&emmc_sdmmc, SDMMC_4, SDMMC_VOLTAGE_1V8, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_MMC_INIT);
+    sdmmc_init(&emmc_sdmmc, SDMMC_4, SDMMC_VOLTAGE_1V8, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_MMC_IDENT);
 
     if (!mount_sd())
         ret = -1;
