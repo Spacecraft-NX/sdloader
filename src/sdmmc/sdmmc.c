@@ -837,6 +837,10 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
     uint8_t ssr[64] = {0};
     uint8_t switch_status[512] = {0};
     
+    // Some cards (SanDisk U1), do not like a fast power cycle. Wait min 100ms.
+    // T210/T210B01 WAR: Wait exactly 239ms for IO and Controller power to discharge.
+    mdelay(239);
+
     /* Initialize our device's struct. */
     memset(device, 0, sizeof(sdmmc_device_t));
     
@@ -853,7 +857,7 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
     sdmmc_info(sdmmc, "SDMMC driver was successfully initialized for SD!");
     
     /* Apply at least 74 clock cycles. The card should be ready afterwards. */
-    udelay((74000 + sdmmc->internal_divider - 1) / sdmmc->internal_divider);
+    udelay(1000 + (74000 + sdmmc->internal_divider - 1) / sdmmc->internal_divider);
 
     /* Instruct the SD card to go idle. */
     if (!sdmmc_device_go_idle(device))
