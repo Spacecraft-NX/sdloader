@@ -1,5 +1,7 @@
 /*
+ * Copyright (c) 2018 naehrwert
  * Copyright (c) 2018-2020 Atmosphère-NX
+ * Copyright (c) 2018-2020 CTCaer
  * Copyright (c) 2020 Spacecraft-NX
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -117,6 +119,20 @@ __attribute__((noreturn)) void power_off(void) {
     uint8_t val = MAX77620_ONOFFCNFG1_PWR_OFF;
     i2c_send(I2C_5, MAX77620_PWR_I2C_ADDR, MAX77620_REG_ONOFFCNFG1, &val, 1);
     while (1);
+}
+
+__attribute__((noreturn)) void panic(uint32_t val) {
+    // Set panic code.
+    PMC(APBDEV_PMC_SCRATCH200) = val;
+    //PMC(APBDEV_PMC_CRYPTO_OP) = PMC_CRYPTO_OP_SE_DISABLE;
+    TMR(TIMER_WDT4_UNLOCK_PATTERN) = TIMER_MAGIC_PTRN;
+    TMR(TIMER_TMR9_TMR_PTV) = TIMER_EN | TIMER_PER_EN;
+    TMR(TIMER_WDT4_CONFIG)  = TIMER_SRC(9) | TIMER_PER(1) | TIMER_PMCRESET_EN;
+    TMR(TIMER_WDT4_COMMAND) = TIMER_START_CNT;
+
+    while (true) {
+        /* Wait for reboot. */
+    }
 }
 
 #define SE_CTX_SAVE_AUTO ((volatile uint32_t) 0x70012074)

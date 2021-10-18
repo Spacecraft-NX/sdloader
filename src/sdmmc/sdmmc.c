@@ -727,11 +727,11 @@ static int sdmmc_sd_switch_hs_low(sdmmc_device_t *device, uint8_t *status)
             return 0;
 
         /* Reconfigure the internal clock. */
-        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_UHS_SDR104))
+        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_SD_SDR104))
             return 0;
 
         /* Run tuning. */
-        if (!sdmmc_execute_tuning(device->sdmmc, SDMMC_SPEED_UHS_SDR104, MMC_SEND_TUNING_BLOCK))
+        if (!sdmmc_execute_tuning(device->sdmmc, SDMMC_SPEED_SD_SDR104, MMC_SEND_TUNING_BLOCK))
             return 0;
     }
     else if (status[13] & SD_MODE_UHS_SDR50)    /* High-speed SDR50 is supported. */
@@ -741,11 +741,11 @@ static int sdmmc_sd_switch_hs_low(sdmmc_device_t *device, uint8_t *status)
             return 0;
 
         /* Reconfigure the internal clock. */
-        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_UHS_SDR50))
+        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_SD_SDR50))
             return 0;
 
         /* Run tuning. */
-        if (!sdmmc_execute_tuning(device->sdmmc, SDMMC_SPEED_UHS_SDR50, MMC_SEND_TUNING_BLOCK))
+        if (!sdmmc_execute_tuning(device->sdmmc, SDMMC_SPEED_SD_SDR50, MMC_SEND_TUNING_BLOCK))
             return 0;
     }
     else if (status[13] & SD_MODE_UHS_SDR12)    /* High-speed SDR12 is supported. */
@@ -755,11 +755,11 @@ static int sdmmc_sd_switch_hs_low(sdmmc_device_t *device, uint8_t *status)
             return 0;
 
         /* Reconfigure the internal clock. */
-        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_UHS_SDR12))
+        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_SD_SDR12))
             return 0;
 
         /* Run tuning. */
-        if (!sdmmc_execute_tuning(device->sdmmc, SDMMC_SPEED_UHS_SDR12, MMC_SEND_TUNING_BLOCK))
+        if (!sdmmc_execute_tuning(device->sdmmc, SDMMC_SPEED_SD_SDR12, MMC_SEND_TUNING_BLOCK))
             return 0;
     }
     else
@@ -784,7 +784,7 @@ static int sdmmc_sd_switch_hs_high(sdmmc_device_t *device, uint8_t *status)
             return 0;
         
         /* Reconfigure the internal clock. */
-        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_UHS_SDR25))
+        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_SD_SDR25))
             return 0;
         
         /* Peek the SD card's status. */
@@ -837,11 +837,15 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
     uint8_t ssr[64] = {0};
     uint8_t switch_status[512] = {0};
     
+    // Some cards (SanDisk U1), do not like a fast power cycle. Wait min 100ms.
+    // T210/T210B01 WAR: Wait exactly 239ms for IO and Controller power to discharge.
+    mdelay(239);
+
     /* Initialize our device's struct. */
     memset(device, 0, sizeof(sdmmc_device_t));
     
     /* Try to initialize the driver. */
-    if (!sdmmc_init(sdmmc, SDMMC_1, SDMMC_VOLTAGE_3V3, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_SD_INIT))
+    if (!sdmmc_init(sdmmc, SDMMC_1, SDMMC_VOLTAGE_3V3, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_SD_IDENT))
     {
         sdmmc_error(sdmmc, "Failed to initialize the SDMMC driver!");
         return 0;
@@ -853,7 +857,7 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
     sdmmc_info(sdmmc, "SDMMC driver was successfully initialized for SD!");
     
     /* Apply at least 74 clock cycles. The card should be ready afterwards. */
-    udelay((74000 + sdmmc->internal_divider - 1) / sdmmc->internal_divider);
+    udelay(1000 + (74000 + sdmmc->internal_divider - 1) / sdmmc->internal_divider);
 
     /* Instruct the SD card to go idle. */
     if (!sdmmc_device_go_idle(device))
@@ -874,7 +878,7 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
     sdmmc_info(sdmmc, "Sent if cond to SD card!");
 
     /* Get the SD card's operating conditions. */
-    if (!sdmmc_sd_send_op_cond(device, is_sd_ver2, (bus_width == SDMMC_BUS_WIDTH_4BIT) && (bus_speed == SDMMC_SPEED_UHS_SDR104)))
+    if (!sdmmc_sd_send_op_cond(device, is_sd_ver2, (bus_width == SDMMC_BUS_WIDTH_4BIT) && (bus_speed == SDMMC_SPEED_SD_SDR104)))
     {
         sdmmc_error(sdmmc, "Failed to send op cond!");
         return 0;
@@ -920,7 +924,7 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
     if (!device->is_180v)
     {
         /* Reconfigure the internal clock. */
-        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_SD_LEGACY))
+        if (!sdmmc_select_speed(device->sdmmc, SDMMC_SPEED_SD_DS))
         {
             sdmmc_error(sdmmc, "Failed to apply the correct bus speed!");
             return 0;
@@ -998,7 +1002,7 @@ int sdmmc_device_sd_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth b
         
         sdmmc_info(sdmmc, "Switched to high-speed from low voltage!");
     }
-    else if ((device->scr.sda_vsn & (SD_SCR_SPEC_VER_1 | SD_SCR_SPEC_VER_2)) && ((bus_speed != SDMMC_SPEED_SD_LEGACY)))
+    else if ((device->scr.sda_vsn & (SD_SCR_SPEC_VER_1 | SD_SCR_SPEC_VER_2)) && ((bus_speed != SDMMC_SPEED_SD_DS)))
     {
         /* Switch to high-speed from high voltage (if possible). */
         if (!sdmmc_sd_switch_hs_high(device, switch_status))
@@ -1397,7 +1401,7 @@ int sdmmc_device_mmc_init(sdmmc_device_t *device, sdmmc_t *sdmmc, SdmmcBusWidth 
     memset(device, 0, sizeof(sdmmc_device_t));
     
     /* Try to initialize the driver. */
-    if (!sdmmc_init(sdmmc, SDMMC_4, SDMMC_VOLTAGE_1V8, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_MMC_INIT))
+    if (!sdmmc_init(sdmmc, SDMMC_4, SDMMC_VOLTAGE_1V8, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_MMC_IDENT))
     {
         sdmmc_error(sdmmc, "Failed to initialize the SDMMC driver!");
         return 0;

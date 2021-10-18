@@ -37,7 +37,6 @@ static void *g_framebuffer;
 static sdmmc_t emmc_sdmmc;
 
 static void setup_display(void) {
-    fuse_init();
     sdram_init();
 
     g_framebuffer = (void *) 0xC0000000;
@@ -379,10 +378,16 @@ int main(void) {
     uint8_t modchip_buf[512];
 
     nx_hwinit();
-    sdmmc_init(&emmc_sdmmc, SDMMC_4, SDMMC_VOLTAGE_1V8, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_MMC_INIT);
+    fuse_init();
+    sdmmc_init(&emmc_sdmmc, SDMMC_4, SDMMC_VOLTAGE_1V8, SDMMC_BUS_WIDTH_1BIT, SDMMC_SPEED_MMC_IDENT);
 
     if (!mount_sd())
         ret = -1;
+
+    /* Set Boot to OFW flag only if VOL_UP is pressed. */
+    uint32_t btn = btn_read();
+    if (btn & BTN_VOL_UP && !(btn & BTN_VOL_DOWN))
+        ret = -6;
     
     if (ret == 0)
     {
@@ -419,6 +424,15 @@ int main(void) {
                 draw_table(no_bin, 52, 52, 42);
             else if (ret == -3)
                 draw_table(big_bin, 48, 48, 37);
+            else if (ret == -6)
+            {
+                /* Boot to OFW */
+                /* Some delay is required for modchip to enter sleep mode. */
+                sdmmc_finish(&emmc_sdmmc);
+                unmount_sd();
+                /* Bypass fuse programming in package1. */
+                panic(0x21);
+            }
 
             display_backlight(true);
             
