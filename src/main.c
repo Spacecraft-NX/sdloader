@@ -384,9 +384,9 @@ int main(void) {
     if (!mount_sd())
         ret = -1;
 
-    /* Set Boot to OFW flag if VOL_DOWN is pressed. */
+    /* Set Boot to OFW flag only if VOL_UP is pressed. */
     uint32_t btn = btn_read();
-    if (btn & BTN_VOL_DOWN)
+    if (btn & BTN_VOL_UP && !(btn & BTN_VOL_DOWN))
         ret = -6;
     
     if (ret == 0)
